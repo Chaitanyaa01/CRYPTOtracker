@@ -1,0 +1,22 @@
+# Node modules
+/node_modules
+/frontend/node_modules
+/backend/node_modules
+
+# Build outputs
+/frontend/build
+
+# Logs and runtime files
+/backend/server.log
+/frontend.log
+
+# Env files
+.env
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
