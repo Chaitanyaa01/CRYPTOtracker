@@ -9,7 +9,11 @@ const alertSchema = new mongoose.Schema({
   },
   coinId: {
     type: String,
-    required: true // e.g., 'bitcoin'
+    required: true
+  },
+  coinName: {
+    type: String,
+    required: true
   },
   targetPrice: {
     type: Number,
@@ -17,13 +21,28 @@ const alertSchema = new mongoose.Schema({
   },
   condition: {
     type: String,
-    enum: ['above', 'below'], // E.g., Alert me when BTC goes 'above' 70000
+    enum: ['above', 'below'],
     required: true
+  },
+  active: {
+    type: Boolean,
+    default: true
   },
   isTriggered: {
     type: Boolean,
     default: false
+  },
+  triggeredPrice: {
+    type: Number
+  },
+  lastCheckedAt: {
+    type: Date
+  },
+  lastTriggeredAt: {
+    type: Date
   }
-});
+}, { timestamps: true });
+
+alertSchema.index({ userId: 1, coinId: 1, active: 1 });
 
 export default mongoose.model("Alert", alertSchema);

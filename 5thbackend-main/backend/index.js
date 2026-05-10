@@ -16,16 +16,16 @@ connect();
 // Import routes
 import cryptoRoutes from './Routes/CryptoRoutes.js';
 import authRoutes from './Routes/AuthRoutes.js';
+import alertRoutes from './Routes/AlertRoutes.js';
 import mongoose from 'mongoose';
 import { startScheduledFetch, fetchData, getFetchStatus } from './controller/Crypto.js';
-import cron from 'node-cron';
-import Alert from './Model/Alert.js';
 
 // Register API routes
 app.use('/api', cryptoRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api', alertRoutes);
 
-// to serve frontend static build if available (production).
+
 import path from 'path';
 import fs from 'fs';
 
@@ -55,9 +55,7 @@ if (fs.existsSync(frontendBuildPath) && fs.existsSync(indexHtmlPath)) {
     });
 }
 
-// Do NOT run the periodic fetch on startup — it will be manually enabled once DB is stable
-// import { fetchData } from './controller/Crypto.js';
-// fetchData();
+
 
 app.listen(PORT, () => {
         console.log(`🚀 Server is running at http://localhost:${PORT}`);

@@ -24,6 +24,12 @@ const HistoryDataSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  volume_24h: {
+    type: Number,
+  },
+  market_cap_rank: {
+    type: Number,
+  },
   timestamp: {
     type: Date,
     required: true,

@@ -6,6 +6,11 @@ import { apiEndpoint } from '../smallapi';
 
 const WATCHLIST_KEY = 'crypto_watchlist_v1';
 
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 function formatCompactUsd(n) {
   if (n == null || Number.isNaN(n)) return '—';
   return new Intl.NumberFormat('en-US', {
@@ -55,6 +60,15 @@ const Home = () => {
   const [marketFilter, setMarketFilter] = useState('all');
   const [watchlist, setWatchlist] = useState(readWatchlist);
   const [feedStatus, setFeedStatus] = useState(null);
+  const [alerts, setAlerts] = useState([]);
+  const [alertForm, setAlertForm] = useState({
+    coinId: '',
+    condition: 'above',
+    targetPrice: '',
+  });
+  const [alertLoading, setAlertLoading] = useState(false);
+  const [alertError, setAlertError] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
 
   const fetchCoins = useCallback(async () => {
     try {
@@ -77,10 +91,67 @@ const Home = () => {
     }
   }, []);
 
+  const fetchAlerts = useCallback(async () => {
+    try {
+      const { data } = await axios.get(`${apiEndpoint}/api/alerts`, {
+        headers: getAuthHeaders(),
+      });
+      setAlerts(data.alerts || []);
+      setAlertError('');
+    } catch (err) {
+      setAlertError(err.response?.data?.message || 'Could not load alerts');
+    }
+  }, []);
+
   const handleManualRefresh = async () => {
     setLoading(true);
     await fetchCoins();
     await refreshFeedStatus();
+    await fetchAlerts();
+  };
+
+  const handleCreateAlert = async (e) => {
+    e.preventDefault();
+    setAlertLoading(true);
+    setAlertError('');
+    setAlertMessage('');
+
+    try {
+      const { data } = await axios.post(`${apiEndpoint}/api/alerts`, alertForm, {
+        headers: getAuthHeaders(),
+      });
+      setAlerts((prev) => [data.alert, ...prev]);
+      setAlertForm((prev) => ({ ...prev, targetPrice: '' }));
+      setAlertMessage(data.alert.isTriggered ? 'Alert created and already triggered.' : 'Alert created.');
+    } catch (err) {
+      setAlertError(err.response?.data?.message || 'Could not create alert');
+    } finally {
+      setAlertLoading(false);
+    }
+  };
+
+  const updateAlert = async (alertId, payload) => {
+    setAlertError('');
+    try {
+      const { data } = await axios.patch(`${apiEndpoint}/api/alerts/${alertId}`, payload, {
+        headers: getAuthHeaders(),
+      });
+      setAlerts((prev) => prev.map((alert) => (alert.id === alertId ? data.alert : alert)));
+    } catch (err) {
+      setAlertError(err.response?.data?.message || 'Could not update alert');
+    }
+  };
+
+  const deleteAlert = async (alertId) => {
+    setAlertError('');
+    try {
+      await axios.delete(`${apiEndpoint}/api/alerts/${alertId}`, {
+        headers: getAuthHeaders(),
+      });
+      setAlerts((prev) => prev.filter((alert) => alert.id !== alertId));
+    } catch (err) {
+      setAlertError(err.response?.data?.message || 'Could not delete alert');
+    }
   };
 
   const toggleWatchlist = (coinId, e) => {
@@ -116,8 +187,9 @@ const Home = () => {
     const vol = filteredCoins.reduce((s, c) => s + (c.volume_24h || 0), 0);
     const up = filteredCoins.filter((c) => (c.change_24h_pct || 0) > 0).length;
     const down = filteredCoins.filter((c) => (c.change_24h_pct || 0) < 0).length;
-    return { n, cap, vol, up, down };
-  }, [filteredCoins]);
+    const triggered = alerts.filter((alert) => alert.isTriggered).length;
+    return { n, cap, vol, up, down, triggered };
+  }, [filteredCoins, alerts]);
 
   const sortedCoins = useMemo(() => {
     return [...filteredCoins].sort((a, b) => {
@@ -156,12 +228,20 @@ const Home = () => {
   useEffect(() => {
     fetchCoins();
     refreshFeedStatus();
+    fetchAlerts();
     const interval = setInterval(() => {
       fetchCoins();
       refreshFeedStatus();
+      fetchAlerts();
     }, 30 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [fetchCoins, refreshFeedStatus]);
+  }, [fetchCoins, refreshFeedStatus, fetchAlerts]);
+
+  useEffect(() => {
+    if (selectedCoinId) {
+      setAlertForm((prev) => ({ ...prev, coinId: selectedCoinId }));
+    }
+  }, [selectedCoinId]);
 
   useEffect(() => {
     const fetchHistoricalData = async () => {
@@ -181,6 +261,7 @@ const Home = () => {
   }, [selectedCoinId]);
 
   const selectedCoin = coins.find((c) => c.coin_id === selectedCoinId);
+  const triggeredAlerts = alerts.filter((alert) => alert.isTriggered);
   const lastFetchLabel = feedStatus?.crypto?.lastFetchAt
     ? new Date(feedStatus.crypto.lastFetchAt).toLocaleString()
     : null;
@@ -206,7 +287,7 @@ const Home = () => {
           <div>
             <h2 className="text-2xl font-bold text-white sm:text-3xl">Markets</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Top listings with rankings, volume, and watchlist. Click a row for price history.
+              Top 50 listings with rankings, volume, watchlist, and price alerts. Click a row for price history.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -256,9 +337,162 @@ const Home = () => {
             <p className="text-xs text-gray-500 mt-0.5">in view</p>
           </div>
           <div className="rounded-xl bg-gray-900/80 border border-gray-800 p-4 col-span-2 sm:col-span-4 lg:col-span-1">
-            <p className="text-xs uppercase tracking-wide text-gray-500">Watchlist</p>
-            <p className="text-xl font-semibold text-violet-400 mt-1">{watchlist.length}</p>
-            <p className="text-xs text-gray-500 mt-0.5">saved locally</p>
+            <p className="text-xs uppercase tracking-wide text-gray-500">Alerts</p>
+            <p className="text-xl font-semibold text-violet-400 mt-1">{alerts.length}</p>
+            <p className="text-xs text-gray-500 mt-0.5">{stats.triggered} triggered</p>
+          </div>
+        </section>
+
+        {triggeredAlerts.length > 0 && (
+          <section className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-left">
+            <p className="text-sm font-semibold text-amber-200">Triggered price alerts</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {triggeredAlerts.map((alert) => (
+                <span key={alert.id} className="rounded-lg bg-gray-950/60 px-3 py-1 text-sm text-amber-100">
+                  {alert.coinName} {alert.condition} {formatPrice(alert.targetPrice)}
+                </span>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+          <form
+            onSubmit={handleCreateAlert}
+            className="rounded-xl border border-gray-800 bg-gray-900/70 p-4 text-left"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-white">Create price alert</p>
+                <p className="mt-1 text-xs text-gray-500">Alerts trigger when fresh market data crosses your target.</p>
+              </div>
+              {selectedCoin && (
+                <span className="rounded-lg bg-gray-950 px-2.5 py-1 text-xs text-gray-400">
+                  Selected: {selectedCoin.symbol.toUpperCase()}
+                </span>
+              )}
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-[1.2fr_0.8fr_1fr]">
+              <select
+                required
+                value={alertForm.coinId}
+                onChange={(e) => setAlertForm((prev) => ({ ...prev, coinId: e.target.value }))}
+                className="rounded-lg border border-gray-700 bg-gray-950 px-3 py-2.5 text-sm text-white focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500/40"
+                aria-label="Alert coin"
+              >
+                <option value="">Select coin</option>
+                {coins.map((coin) => (
+                  <option key={coin.coin_id} value={coin.coin_id}>
+                    {coin.name} ({coin.symbol.toUpperCase()})
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={alertForm.condition}
+                onChange={(e) => setAlertForm((prev) => ({ ...prev, condition: e.target.value }))}
+                className="rounded-lg border border-gray-700 bg-gray-950 px-3 py-2.5 text-sm text-white focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500/40"
+                aria-label="Alert condition"
+              >
+                <option value="above">Above</option>
+                <option value="below">Below</option>
+              </select>
+
+              <input
+                required
+                type="number"
+                min="0"
+                step="any"
+                value={alertForm.targetPrice}
+                onChange={(e) => setAlertForm((prev) => ({ ...prev, targetPrice: e.target.value }))}
+                placeholder="Target USD"
+                className="rounded-lg border border-gray-700 bg-gray-950 px-3 py-2.5 text-sm text-white placeholder:text-gray-600 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500/40"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={alertLoading}
+              className="mt-3 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-black hover:bg-amber-300 disabled:opacity-50"
+            >
+              {alertLoading ? 'Saving...' : 'Add alert'}
+            </button>
+            {alertMessage && <p className="mt-3 text-sm text-emerald-300">{alertMessage}</p>}
+            {alertError && <p className="mt-3 text-sm text-rose-300">{alertError}</p>}
+          </form>
+
+          <div className="rounded-xl border border-gray-800 bg-gray-900/70 p-4 text-left">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-white">Active alert board</p>
+                <p className="mt-1 text-xs text-gray-500">{watchlist.length} coins on local watchlist</p>
+              </div>
+              <button
+                type="button"
+                onClick={fetchAlerts}
+                className="rounded-lg border border-gray-700 bg-gray-950 px-3 py-1.5 text-xs font-medium text-gray-300 hover:text-white"
+              >
+                Sync
+              </button>
+            </div>
+
+            <div className="mt-4 max-h-60 space-y-2 overflow-y-auto pr-1">
+              {alerts.length === 0 && (
+                <p className="rounded-lg border border-dashed border-gray-700 px-3 py-6 text-center text-sm text-gray-500">
+                  No alerts yet. Pick a coin and target price to start.
+                </p>
+              )}
+              {alerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  className={`rounded-lg border px-3 py-3 ${
+                    alert.isTriggered
+                      ? 'border-amber-500/40 bg-amber-500/10'
+                      : 'border-gray-800 bg-gray-950/70'
+                  }`}
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-medium text-white">{alert.coinName}</p>
+                      <p className="text-sm text-gray-400">
+                        {alert.condition} {formatPrice(alert.targetPrice)}
+                        {alert.triggeredPrice ? ` at ${formatPrice(alert.triggeredPrice)}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => updateAlert(alert.id, { active: !alert.active })}
+                        className={`rounded-md px-2.5 py-1 text-xs font-medium ${
+                          alert.active
+                            ? 'bg-emerald-500/15 text-emerald-300'
+                            : 'bg-gray-800 text-gray-400'
+                        }`}
+                      >
+                        {alert.active ? 'Active' : 'Paused'}
+                      </button>
+                      {alert.isTriggered && (
+                        <button
+                          type="button"
+                          onClick={() => updateAlert(alert.id, { resetTriggered: true })}
+                          className="rounded-md bg-gray-800 px-2.5 py-1 text-xs font-medium text-gray-300 hover:text-white"
+                        >
+                          Reset
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => deleteAlert(alert.id)}
+                        className="rounded-md bg-rose-500/15 px-2.5 py-1 text-xs font-medium text-rose-300 hover:bg-rose-500/25"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 

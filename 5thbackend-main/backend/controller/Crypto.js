@@ -2,6 +2,7 @@ import axios from 'axios';
 import cron from 'node-cron';
 import CurrentData from '../Model/CurrentData.js';
 import HistoryData from '../Model/HistoryData.js';
+import { evaluateAlertsForCoins } from './Alert.js';
 
 const fetchData = async () => {
   try {
@@ -9,9 +10,10 @@ const fetchData = async () => {
       params: {
         vs_currency: 'usd',
         order: 'market_cap_desc',
-        per_page: 10,
+        per_page: 50,
         page: 1,
         sparkline: false,
+        price_change_percentage: '1h,24h,7d',
       },
     });
 
@@ -24,11 +26,21 @@ const fetchData = async () => {
           name: coinData.name,
           symbol: coinData.symbol,
           price_usd: coinData.current_price,
-          market_cap: coinData.market_cap,
-          change_24h_pct: coinData.price_change_percentage_24h,
+          market_cap: coinData.market_cap || 0,
+          change_24h_pct: coinData.price_change_percentage_24h || 0,
+          change_1h_pct: coinData.price_change_percentage_1h_in_currency,
+          change_7d_pct: coinData.price_change_percentage_7d_in_currency,
           image: coinData.image || '',
           market_cap_rank: coinData.market_cap_rank,
           volume_24h: coinData.total_volume,
+          high_24h: coinData.high_24h,
+          low_24h: coinData.low_24h,
+          circulating_supply: coinData.circulating_supply,
+          total_supply: coinData.total_supply,
+          fully_diluted_valuation: coinData.fully_diluted_valuation,
+          ath: coinData.ath,
+          atl: coinData.atl,
+          last_updated: coinData.last_updated ? new Date(coinData.last_updated) : undefined,
           timestamp: new Date(),
         },
         { upsert: true, new: true }
@@ -39,11 +51,19 @@ const fetchData = async () => {
         name: coinData.name,
         symbol: coinData.symbol,
         price_usd: coinData.current_price,
-        market_cap: coinData.market_cap,
-        change_24h_pct: coinData.price_change_percentage_24h,
+        market_cap: coinData.market_cap || 0,
+        change_24h_pct: coinData.price_change_percentage_24h || 0,
+        volume_24h: coinData.total_volume,
+        market_cap_rank: coinData.market_cap_rank,
         timestamp: new Date(),
       });
       await historyEntry.save();
+    }
+
+    try {
+      await evaluateAlertsForCoins(coins);
+    } catch (alertError) {
+      console.warn('Alert evaluation failed:', alertError && alertError.message ? alertError.message : alertError);
     }
     console.log('Cryptocurrency data fetched and saved successfully to CurrentData and HistoryData!');
     // update last-fetch metadata
@@ -80,7 +100,7 @@ const getFetchStatus = () => ({
 
 export const getCurrentCoins = async (req, res) => {
   try {
-    const coins = await CurrentData.find({});
+    const coins = await CurrentData.find({}).sort({ market_cap_rank: 1 });
     res.json(coins);
   } catch (error) {
     console.error('Error fetching current data from DB:', error.message);

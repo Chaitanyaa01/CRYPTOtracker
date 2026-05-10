@@ -26,6 +26,12 @@ const CurrentDataSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  change_1h_pct: {
+    type: Number,
+  },
+  change_7d_pct: {
+    type: Number,
+  },
   image: {
     type: String,
     default: '',
@@ -35,6 +41,30 @@ const CurrentDataSchema = new mongoose.Schema({
   },
   volume_24h: {
     type: Number,
+  },
+  high_24h: {
+    type: Number,
+  },
+  low_24h: {
+    type: Number,
+  },
+  circulating_supply: {
+    type: Number,
+  },
+  total_supply: {
+    type: Number,
+  },
+  fully_diluted_valuation: {
+    type: Number,
+  },
+  ath: {
+    type: Number,
+  },
+  atl: {
+    type: Number,
+  },
+  last_updated: {
+    type: Date,
   },
   timestamp: {
     type: Date,

@@ -59,6 +59,25 @@ Create a `.env` file in `backend/` with the following keys:
 MONGO_URI=mongodb+srv://<username>:<password>@cluster0.yourcluster.mongodb.net/yourdbname?retryWrites=true&w=majority
 PORT=5001
 JWT_SECRET=<a long random secret>
+FIREBASE_PROJECT_ID=<your Firebase project id>
+FIREBASE_CLIENT_EMAIL=<service account client email>
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+```
+
+Firebase service account alternative:
+
+```env
+FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"..."}
+```
+
+Create a `.env` file in `frontend/` for Firebase email OTP / one-time link auth:
+
+```env
+REACT_APP_API_URL=http://localhost:5001
+REACT_APP_FIREBASE_API_KEY=<firebase web api key>
+REACT_APP_FIREBASE_AUTH_DOMAIN=<project>.firebaseapp.com
+REACT_APP_FIREBASE_PROJECT_ID=<your Firebase project id>
+REACT_APP_FIREBASE_APP_ID=<firebase web app id>
 ```
 
 Notes:
@@ -93,6 +112,10 @@ Useful endpoints:
 - `GET /api/coins` — get current coin data
 - `GET /api/history/:coinId` — get history for a coin
 - `POST /api/history` — trigger a manual fetch of historical data
+- `GET /api/alerts` — list authenticated user's price alerts
+- `POST /api/alerts` — create a price alert
+- `PATCH /api/alerts/:alertId` — pause, reset, or update an alert
+- `DELETE /api/alerts/:alertId` — delete an alert
 
 ---
 
