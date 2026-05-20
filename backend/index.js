@@ -3,16 +3,25 @@ import cors from 'cors';
 import 'dotenv/config';
 import { connect } from './config/database.js';
 import mongoose from 'mongoose';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Import routes
 import cryptoRoutes from './Routes/CryptoRoutes.js';
 import authRoutes from './Routes/AuthRoutes.js';
 import alertRoutes from './Routes/AlertRoutes.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// Serve frontend static files if they exist
+const buildPath = path.join(__dirname, '../frontend/build');
+app.use(express.static(buildPath));
 
 // Connect to DB (in serverless, this will reuse connection if possible)
 connect().catch(err => console.error('Initial DB connection error:', err));
@@ -39,6 +48,11 @@ app.get('/api/health', (req, res) => {
             status: stateMap[mongooseState] || 'unknown',
         }
     });
+});
+
+// Serve React app for any non-API route
+app.get('*', (req, res) => {
+    res.sendFile(path.join(buildPath, 'index.html'));
 });
 
 // Start server unless running on Vercel (serverless)
