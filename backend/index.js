@@ -41,11 +41,11 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// For local development
-if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+// Start server unless running on Vercel (serverless)
+if (!process.env.VERCEL) {
     const PORT = process.env.PORT || 5001;
     app.listen(PORT, () => {
-        console.log(`🚀 Local server running at http://localhost:${PORT}`);
+        console.log(`🚀 Server running at http://localhost:${PORT}`);
     });
 }
 
