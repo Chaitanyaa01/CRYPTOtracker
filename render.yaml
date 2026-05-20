@@ -1,19 +1,11 @@
 # Render.yaml defining backend and frontend services for Render.com
 services:
   - type: web
-    name: crypto-tracker-backend
+    name: crypto-tracker
     env: node
     plan: free
-    # Use --prefix so commands run reliably from repo root on Render
-    buildCommand: npm --prefix backend install
+    buildCommand: npm --prefix frontend install && npm --prefix frontend run build && npm --prefix backend install
     startCommand: npm --prefix backend start
-
-  - type: static
-    name: crypto-tracker-frontend
-    env: static
-    plan: free
-    buildCommand: npm --prefix frontend install && npm --prefix frontend run build
-    staticPublishPath: frontend/build
 
 # Note: Add any environment variables (e.g., MONGO_URI, FIREBASE credentials)
 # in the Render dashboard for the backend service.

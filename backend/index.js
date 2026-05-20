@@ -51,7 +51,10 @@ app.get('/api/health', (req, res) => {
 });
 
 // Serve React app for any non-API route
-app.get('*', (req, res) => {
+app.use((req, res, next) => {
+    if (req.path.startsWith('/api')) {
+        return next();
+    }
     res.sendFile(path.join(buildPath, 'index.html'));
 });
 
