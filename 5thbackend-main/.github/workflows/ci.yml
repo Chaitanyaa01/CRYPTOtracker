@@ -7,7 +7,7 @@ on:
     branches: [ main, master ]
 
 jobs:
-  build-frontend:
+  test-frontend:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -29,9 +29,12 @@ jobs:
       - name: Build frontend
         run: npm run build
         env:
-          CI: false # Prevents treating warnings as errors in Create React App
+          CI: false
 
-  build-backend:
+      - name: Run tests
+        run: npm test -- --watchAll=false
+
+  test-backend:
     runs-on: ubuntu-latest
     defaults:
       run:

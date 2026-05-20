@@ -4,6 +4,7 @@ import { getCurrentCoins, getHistoryData, triggerHistoryDataFetch } from '../con
 const router = express.Router();
 
 router.get('/coins', getCurrentCoins);
+router.get('/history', triggerHistoryDataFetch);
 router.post('/history', triggerHistoryDataFetch);
 router.get('/history/:coinId', getHistoryData);
 
