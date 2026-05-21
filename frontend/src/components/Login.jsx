@@ -1,26 +1,16 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import axios from 'axios';
-import {
-  isSignInWithEmailLink,
-  sendSignInLinkToEmail,
-  signInWithEmailLink,
-  signInWithPopup,
-} from 'firebase/auth';
+import { signInWithPopup } from 'firebase/auth';
 import { apiEndpoint } from '../smallapi';
-import { firebaseAuth, isFirebaseConfigured, googleProvider } from '../firebase';
-
-const FIREBASE_EMAIL_KEY = 'firebase_email_otp_address';
+import { firebaseAuth, googleProvider } from '../firebase';
 
 const Login = ({ onLogin, switchToSignup }) => {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
-  const [otpEmail, setOtpEmail] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpMessage, setOtpMessage] = useState('');
-  const [otpLoading, setOtpLoading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
 
   const finishFirebaseLogin = useCallback(async (firebaseUser) => {
@@ -30,36 +20,11 @@ const Login = ({ onLogin, switchToSignup }) => {
     if (response.data.success) {
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
-      localStorage.removeItem(FIREBASE_EMAIL_KEY);
       onLogin(response.data.user);
     }
   }, [onLogin]);
 
-  useEffect(() => {
-    const completeEmailLink = async () => {
-      if (!isFirebaseConfigured || !isSignInWithEmailLink(firebaseAuth, window.location.href)) return;
 
-      const savedEmail = localStorage.getItem(FIREBASE_EMAIL_KEY);
-      if (!savedEmail) {
-        setOtpMessage('Enter your email below to finish the one-time link sign in.');
-        return;
-      }
-
-      setOtpLoading(true);
-      setError('');
-
-      try {
-        const result = await signInWithEmailLink(firebaseAuth, savedEmail, window.location.href);
-        await finishFirebaseLogin(result.user);
-      } catch (err) {
-        setError(err.response?.data?.message || err.message || 'Could not complete Firebase email sign in');
-      } finally {
-        setOtpLoading(false);
-      }
-    };
-
-    completeEmailLink();
-  }, [finishFirebaseLogin]);
 
   const handleChange = (e) => {
     setFormData({
@@ -88,59 +53,12 @@ const Login = ({ onLogin, switchToSignup }) => {
     }
   };
 
-  const sendFirebaseOtp = async (e) => {
-    e.preventDefault();
-    setError('');
-    setOtpMessage('');
 
-    if (!isFirebaseConfigured) {
-      setError('Firebase is not configured. Add the REACT_APP_FIREBASE_* values to frontend/.env.');
-      return;
-    }
-
-    if (!otpEmail) {
-      setError('Enter your email address first');
-      return;
-    }
-
-    setOtpLoading(true);
-
-    try {
-      await sendSignInLinkToEmail(firebaseAuth, otpEmail, {
-        url: `${window.location.origin}/login`,
-        handleCodeInApp: true,
-      });
-      localStorage.setItem(FIREBASE_EMAIL_KEY, otpEmail);
-      setOtpSent(true);
-      setOtpMessage('One-time sign-in link sent. Open it from your email to continue.');
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Could not send Firebase email link');
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  const completeManualEmailLink = async (e) => {
-    e.preventDefault();
-    setError('');
-    setOtpLoading(true);
-
-    try {
-      const result = await signInWithEmailLink(firebaseAuth, otpEmail, window.location.href);
-      await finishFirebaseLogin(result.user);
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Could not complete Firebase email sign in');
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  const onEmailLinkPage = isFirebaseConfigured && isSignInWithEmailLink(firebaseAuth, window.location.href);
 
   const googleLogin = async (e) => {
     e.preventDefault();
     setError('');
-    setOtpLoading(true);
+    setGoogleLoading(true);
 
     try {
       const result = await signInWithPopup(firebaseAuth, googleProvider);
@@ -148,7 +66,7 @@ const Login = ({ onLogin, switchToSignup }) => {
     } catch (err) {
       setError(err.message || 'Google sign in failed');
     } finally {
-      setOtpLoading(false);
+      setGoogleLoading(false);
     }
   };
 
@@ -161,7 +79,7 @@ const Login = ({ onLogin, switchToSignup }) => {
             Track markets, set alerts, and move faster.
           </h1>
           <p className="mt-4 max-w-xl text-base text-gray-400">
-            Sign in with your password or use Firebase email OTP to enter with a one-time link.
+            Sign in with your password or Google account.
           </p>
           <div className="mt-8 grid grid-cols-3 gap-3 max-w-lg">
             {['50+ coins', 'Live sync', 'Price alerts'].map((item) => (
@@ -227,43 +145,11 @@ const Login = ({ onLogin, switchToSignup }) => {
             <button
               type="button"
               onClick={googleLogin}
-              disabled={otpLoading}
+              disabled={googleLoading}
               className="w-full flex justify-center py-2.5 px-4 text-sm font-semibold rounded-lg text-gray-900 bg-white hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-950 focus:ring-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {otpLoading ? 'Signing in...' : 'Sign in with Google'}
+              {googleLoading ? 'Signing in...' : 'Sign in with Google'}
             </button>
-          </form>
-
-          <div className="my-6 flex items-center gap-3">
-            <div className="h-px flex-1 bg-gray-800" />
-            <span className="text-xs uppercase tracking-wide text-gray-500">or</span>
-            <div className="h-px flex-1 bg-gray-800" />
-          </div>
-
-          <form className="space-y-3 text-left" onSubmit={onEmailLinkPage ? completeManualEmailLink : sendFirebaseOtp}>
-            <label htmlFor="otpEmail" className="block text-sm font-medium text-gray-300">
-              Firebase email OTP
-            </label>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <input
-                id="otpEmail"
-                name="otpEmail"
-                type="email"
-                className="flex-1 px-3 py-2.5 border border-gray-700 placeholder-gray-500 text-white bg-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500"
-                placeholder="you@example.com"
-                value={otpEmail}
-                onChange={(e) => setOtpEmail(e.target.value)}
-              />
-              <button
-                type="submit"
-                disabled={otpLoading}
-                className="px-4 py-2.5 text-sm font-semibold rounded-lg text-white bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50"
-              >
-                {otpLoading ? 'Working...' : onEmailLinkPage ? 'Verify link' : 'Send OTP'}
-              </button>
-            </div>
-            {otpSent && <p className="text-sm text-cyan-200">Check your inbox and open the one-time link.</p>}
-            {otpMessage && <p className="text-sm text-gray-400">{otpMessage}</p>}
           </form>
 
           {error && (
