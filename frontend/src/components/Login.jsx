@@ -4,9 +4,10 @@ import {
   isSignInWithEmailLink,
   sendSignInLinkToEmail,
   signInWithEmailLink,
+  signInWithPopup,
 } from 'firebase/auth';
 import { apiEndpoint } from '../smallapi';
-import { firebaseAuth, isFirebaseConfigured } from '../firebase';
+import { firebaseAuth, isFirebaseConfigured, googleProvider } from '../firebase';
 
 const FIREBASE_EMAIL_KEY = 'firebase_email_otp_address';
 
@@ -136,6 +137,21 @@ const Login = ({ onLogin, switchToSignup }) => {
 
   const onEmailLinkPage = isFirebaseConfigured && isSignInWithEmailLink(firebaseAuth, window.location.href);
 
+  const googleLogin = async (e) => {
+    e.preventDefault();
+    setError('');
+    setOtpLoading(true);
+
+    try {
+      const result = await signInWithPopup(firebaseAuth, googleProvider);
+      await finishFirebaseLogin(result.user);
+    } catch (err) {
+      setError(err.message || 'Google sign in failed');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#080a0f] text-white flex items-center justify-center py-10 px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-5xl grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
@@ -206,6 +222,15 @@ const Login = ({ onLogin, switchToSignup }) => {
               className="w-full flex justify-center py-2.5 px-4 text-sm font-semibold rounded-lg text-black bg-amber-400 hover:bg-amber-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-950 focus:ring-amber-400 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Signing in...' : 'Sign in'}
+            </button>
+
+            <button
+              type="button"
+              onClick={googleLogin}
+              disabled={otpLoading}
+              className="w-full flex justify-center py-2.5 px-4 text-sm font-semibold rounded-lg text-gray-900 bg-white hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-950 focus:ring-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {otpLoading ? 'Signing in...' : 'Sign in with Google'}
             </button>
           </form>
 
