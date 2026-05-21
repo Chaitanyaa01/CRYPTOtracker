@@ -4,7 +4,7 @@ services:
     name: crypto-tracker
     env: node
     plan: free
-    buildCommand: npm --prefix frontend install && npm --prefix frontend run build && npm --prefix backend install
+    buildCommand: cd frontend && npm install && npm run build && cd ../backend && npm install
     startCommand: npm --prefix backend start
 
 # Note: Add any environment variables (e.g., MONGO_URI, FIREBASE credentials)

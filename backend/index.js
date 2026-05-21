@@ -21,7 +21,9 @@ app.use(express.json());
 
 // Serve frontend static files if they exist
 const buildPath = path.join(__dirname, '../frontend/build');
-app.use(express.static(buildPath));
+if (process.env.NODE_ENV === 'production' || !process.env.VERCEL) {
+    app.use(express.static(buildPath));
+}
 
 // Connect to DB (in serverless, this will reuse connection if possible)
 connect().catch(err => console.error('Initial DB connection error:', err));
@@ -55,7 +57,13 @@ app.use((req, res, next) => {
     if (req.path.startsWith('/api')) {
         return next();
     }
-    res.sendFile(path.join(buildPath, 'index.html'));
+    const indexPath = path.join(buildPath, 'index.html');
+    res.sendFile(indexPath, (err) => {
+        if (err) {
+            console.log('Frontend not available, sending API message');
+            res.status(500).json({ message: 'Frontend build not available' });
+        }
+    });
 });
 
 // Start server unless running on Vercel (serverless)
