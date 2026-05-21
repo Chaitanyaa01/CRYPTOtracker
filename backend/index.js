@@ -3,27 +3,16 @@ import cors from 'cors';
 import 'dotenv/config';
 import { connect } from './config/database.js';
 import mongoose from 'mongoose';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
 // Import routes
 import cryptoRoutes from './Routes/CryptoRoutes.js';
 import authRoutes from './Routes/AuthRoutes.js';
 import alertRoutes from './Routes/AlertRoutes.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const app = express();
 
 app.use(cors());
 app.use(express.json());
-
-// Serve frontend static files if they exist
-const buildPath = path.join(__dirname, '../frontend/build');
-if (process.env.NODE_ENV === 'production' || !process.env.VERCEL) {
-    app.use(express.static(buildPath));
-}
 
 // Connect to DB (in serverless, this will reuse connection if possible)
 connect().catch(err => console.error('Initial DB connection error:', err));
@@ -48,20 +37,6 @@ app.get('/api/health', (req, res) => {
         db: {
             readyState: mongooseState,
             status: stateMap[mongooseState] || 'unknown',
-        }
-    });
-});
-
-// Serve React app for any non-API route
-app.use((req, res, next) => {
-    if (req.path.startsWith('/api')) {
-        return next();
-    }
-    const indexPath = path.join(buildPath, 'index.html');
-    res.sendFile(indexPath, (err) => {
-        if (err) {
-            console.log('Frontend not available, sending API message');
-            res.status(500).json({ message: 'Frontend build not available' });
         }
     });
 });
