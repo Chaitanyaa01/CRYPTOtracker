@@ -32,6 +32,17 @@ const alertSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  emailNotification: {
+    type: Boolean,
+    default: true
+  },
+  emailSent: {
+    type: Boolean,
+    default: false
+  },
+  emailSentAt: {
+    type: Date
+  },
   triggeredPrice: {
     type: Number
   },

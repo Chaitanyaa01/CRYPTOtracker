@@ -130,4 +130,88 @@ export const triggerHistoryDataFetch = async (req, res) => {
   }
 };
 
+// In-memory cache for market chart to avoid hitting CoinGecko rate limit
+const chartCache = new Map();
+const CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
+export const getMarketChart = async (req, res) => {
+  try {
+    const { coinId } = req.params;
+    const days = req.query.days || '1'; // '1', '7', '30', '90', '365', 'max'
+    const cacheKey = `${coinId}_${days}`;
+
+    const cached = chartCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      return res.json(cached.data);
+    }
+
+    try {
+      const response = await axios.get(
+        `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(coinId)}/market_chart`,
+        {
+          params: {
+            vs_currency: 'usd',
+            days: days,
+          },
+          timeout: 8000,
+        }
+      );
+
+      const chartData = response.data;
+      chartCache.set(cacheKey, { timestamp: Date.now(), data: chartData });
+      return res.json(chartData);
+    } catch (apiError) {
+      console.warn(`CoinGecko market_chart failed for ${coinId} (${days}d):`, apiError.message, '- Trying Binance fallback...');
+
+      // Fallback 1: Try Binance Kline API (zero rate limit, real-time)
+      try {
+        const coinDoc = await CurrentData.findOne({ coin_id: coinId });
+        const symbol = (coinDoc?.symbol || coinId).toUpperCase();
+
+        let interval = '1h';
+        let limit = 168;
+        if (days === '1') { interval = '5m'; limit = 288; }
+        else if (days === '7') { interval = '1h'; limit = 168; }
+        else if (days === '30') { interval = '4h'; limit = 180; }
+        else if (days === '90') { interval = '12h'; limit = 180; }
+        else if (days === '365') { interval = '1d'; limit = 365; }
+        else if (days === 'max') { interval = '1w'; limit = 500; }
+
+        const binanceRes = await axios.get('https://api.binance.com/api/v3/klines', {
+          params: { symbol: `${symbol}USDT`, interval, limit },
+          timeout: 6000,
+        });
+
+        if (Array.isArray(binanceRes.data) && binanceRes.data.length > 0) {
+          const prices = binanceRes.data.map((k) => [k[0], parseFloat(k[4])]);
+          const volumes = binanceRes.data.map((k) => [k[0], parseFloat(k[5])]);
+          const chartData = { prices, total_volumes: volumes, source: 'binance' };
+          chartCache.set(cacheKey, { timestamp: Date.now(), data: chartData });
+          console.log(`✅ Loaded chart for ${symbol}USDT from Binance klines (${prices.length} points)`);
+          return res.json(chartData);
+        }
+      } catch (binanceErr) {
+        console.warn(`Binance fallback also failed for ${coinId}:`, binanceErr.message);
+      }
+
+      // Fallback 2: Use HistoryData from MongoDB if available
+      const localHistory = await HistoryData.find({ coin_id: coinId }).sort({ timestamp: 1 }).limit(200);
+      if (localHistory && localHistory.length > 0) {
+        const prices = localHistory.map((h) => [new Date(h.timestamp).getTime(), h.price_usd]);
+        const volumes = localHistory.map((h) => [new Date(h.timestamp).getTime(), h.volume_24h || 0]);
+        return res.json({ prices, total_volumes: volumes, fallback: true });
+      }
+
+      return res.status(apiError.response?.status || 500).json({
+        message: 'Could not fetch market chart data from CoinGecko or Binance',
+        error: apiError.message,
+      });
+    }
+  } catch (error) {
+    console.error('getMarketChart controller error:', error);
+    res.status(500).json({ message: 'Internal server error fetching chart' });
+  }
+};
+
 export { fetchData, startScheduledFetch, getFetchStatus };
+

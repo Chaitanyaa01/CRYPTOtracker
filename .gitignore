@@ -7,7 +7,8 @@
 /frontend/build
 
 # Logs and runtime files
-/backend/server.log
+*.log
+/backend/*.log
 /frontend.log
 
 # Env files

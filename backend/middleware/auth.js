@@ -5,7 +5,7 @@ const LEGACY_JWT_SECRET = 'your-secret-key-change-in-production';
 
 export const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+  const token = (authHeader && authHeader.split(' ')[1]) || req.query?.token;
 
   if (!token) {
     return res.status(401).json({ 
@@ -34,7 +34,7 @@ export const authenticateToken = (req, res, next) => {
   if (verifyError || !decodedToken) {
       return res.status(403).json({ 
         success: false, 
-        message: 'Invalid token' 
+        message: 'Invalid or expired access token' 
       });
   }
 

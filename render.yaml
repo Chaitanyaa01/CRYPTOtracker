@@ -1,11 +1,29 @@
-# Render.yaml defining backend and frontend services for Render.com
+# Render.yaml defining full-stack service for Render.com
 services:
   - type: web
-    name: crypto-tracker
+    name: cryptopulse
     env: node
     plan: free
-    buildCommand: cd frontend && npm install && npm run build && cd ../backend && npm install
+    buildCommand: cd frontend && npm install && CI=false npm run build && cd ../backend && npm install
     startCommand: npm --prefix backend start
-
-# Note: Add any environment variables (e.g., MONGO_URI, FIREBASE credentials)
-# in the Render dashboard for the backend service.
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_SECURE
+        value: "false"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
