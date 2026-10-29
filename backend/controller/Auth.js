@@ -129,9 +129,15 @@ export const login = async (req, res) => {
     });
   } catch (error) {
     console.error('Login error:', error);
+    const isDbError =
+      error?.name === 'MongooseError' ||
+      error?.name === 'MongoServerSelectionError' ||
+      error?.name === 'MongoNetworkError';
     res.status(500).json({
       success: false,
-      message: 'Server error during login',
+      message: isDbError
+        ? 'Database connection failed. Please ensure MongoDB Atlas allows access from 0.0.0.0/0.'
+        : error?.message || 'Server error during login',
     });
   }
 };
