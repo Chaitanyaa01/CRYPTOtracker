@@ -65,11 +65,11 @@ app.get('/api/health', (req, res) => {
 if (fs.existsSync(frontendBuildPath)) {
     console.log(`📦 Serving production frontend build from ${frontendBuildPath}`);
     app.use(express.static(frontendBuildPath));
-    app.get('*', (req, res, next) => {
-        if (req.path.startsWith('/api')) {
-            return next();
+    app.use((req, res, next) => {
+        if (req.method === 'GET' && !req.path.startsWith('/api')) {
+            return res.sendFile(path.join(frontendBuildPath, 'index.html'));
         }
-        res.sendFile(path.join(frontendBuildPath, 'index.html'));
+        next();
     });
 }
 
